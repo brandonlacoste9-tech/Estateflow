@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - role: string (required, 'admin' or 'agent')
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: leads
+    // Document ID: {leadId}
+    // Fields:
+    //   - address: string (required, < 200 chars)
+    //   - phone: string (required, < 20 chars)
+    //   - status: string (required, 'new', 'qualifying', 'hot', 'dead')
+    //   - score: number (required, 0-100)
+    //   - aiSummary: string (optional, < 1000 chars)
+    //   - budget: string (optional, < 100 chars)
+    //   - timeline: string (optional, < 100 chars)
+    //   - transcript: string (optional, < 50000 chars)
+    //   - agentUid: string (required, matches creator)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // Subcollection: leads/{leadId}/messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - leadId: string (required)
+    //   - role: string (required, 'user' or 'bot')
+    //   - content: string (required, < 5000 chars)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "marifaf11@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isAgent() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agent';
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'agent'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLead(data) {
+      return data.keys().hasAll(['address', 'phone', 'status', 'score', 'agentUid', 'createdAt', 'updatedAt']) &&
+             data.address is string && data.address.size() < 200 &&
+             data.phone is string && data.phone.size() < 20 &&
+             data.status in ['new', 'qualifying', 'hot', 'dead'] &&
+             data.score is number && data.score >= 0 && data.score <= 100 &&
+             data.agentUid == request.auth.uid &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             (!('aiSummary' in data) || (data.aiSummary is string && data.aiSummary.size() < 1000)) &&
+             (!('budget' in data) || (data.budget is string && data.budget.size() < 100)) &&
+             (!('timeline' in data) || (data.timeline is string && data.timeline.size() < 100)) &&
+             (!('transcript' in data) || (data.transcript is string && data.transcript.size() < 50000));
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['leadId', 'role', 'content', 'createdAt']) &&
+             data.leadId is string &&
+             data.role in ['user', 'bot'] &&
+             data.content is string && data.content.size() < 5000 &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == 'agent' || isAdmin());
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /leads/{leadId} {
+      allow read: if isAuthenticated() && (resource.data.agentUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidLead(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.agentUid == request.auth.uid || isAdmin()) && isValidLead(request.resource.data);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/leads/$(leadId)).data.agentUid == request.auth.uid || isAdmin());
+        allow create: if isAuthenticated() && (get(/databases/$(database)/documents/leads/$(leadId)).data.agentUid == request.auth.uid || isAdmin()) && isValidMessage(request.resource.data);
+      }
+    }
+  }
+}

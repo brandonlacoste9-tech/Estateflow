@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information for real estate agents.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "displayName": { "type": "string", "description": "The user's display name." },
+        "photoURL": { "type": "string", "description": "The user's profile photo URL." },
+        "role": { "type": "string", "enum": ["admin", "agent"], "description": "The user's role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Represents a potential real estate client.",
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "The property address." },
+        "phone": { "type": "string", "description": "The lead's phone number." },
+        "status": { "type": "string", "enum": ["new", "qualifying", "hot", "dead"], "description": "The lead's current status." },
+        "score": { "type": "number", "description": "The lead's intent score (0-100)." },
+        "aiSummary": { "type": "string", "description": "A brief AI-generated summary of the lead." },
+        "budget": { "type": "string", "description": "The lead's budget." },
+        "timeline": { "type": "string", "description": "The lead's moving timeline." },
+        "transcript": { "type": "string", "description": "The full chat transcript." },
+        "agentUid": { "type": "string", "description": "The UID of the agent assigned to this lead." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the lead was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the lead was last updated." }
+      },
+      "required": ["address", "phone", "status", "score", "agentUid"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message in a chat conversation with a lead.",
+      "type": "object",
+      "properties": {
+        "leadId": { "type": "string", "description": "The ID of the lead this message belongs to." },
+        "role": { "type": "string", "enum": ["user", "bot"], "description": "The sender's role." },
+        "content": { "type": "string", "description": "The message content." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the message was sent." }
+      },
+      "required": ["leadId", "role", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    },
+    "/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Collection of real estate leads."
+    },
+    "/leads/{leadId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Subcollection of messages for each lead."
+    }
+  }
+}

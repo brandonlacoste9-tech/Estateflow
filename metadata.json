@@ -1,0 +1,5 @@
+{
+  "name": "EstateFlow AI",
+  "description": "AI-powered real estate lead generator and agent dashboard for qualifying home sellers.",
+  "requestFramePermissions": ["geolocation"]
+}
