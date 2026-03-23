@@ -3,12 +3,13 @@ import LeadMagnet from './components/LeadMagnet';
 import AgentDashboard from './components/AgentDashboard';
 import ChatInterface from './components/ChatInterface';
 import Login from './components/Login';
+import MarketingLanding from './components/MarketingLanding';
 import { auth } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Home, Users, Building2, ArrowLeft, LogOut } from 'lucide-react';
+import { Home, Users, Building2, ArrowLeft, LogOut, Sparkles } from 'lucide-react';
 import { cn } from './lib/utils';
 
-type View = 'seller' | 'agent';
+type View = 'marketing' | 'seller' | 'agent';
 
 interface CapturedLead {
   id: string;
@@ -17,7 +18,7 @@ interface CapturedLead {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>('seller');
+  const [view, setView] = useState<View>('marketing');
   const [capturedLead, setCapturedLead] = useState<CapturedLead | null>(null);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,16 @@ export default function App() {
       {!capturedLead && (
         <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-white/80 backdrop-blur-md border border-brand-border rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
           <button
+            onClick={() => setView('marketing')}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all",
+              view === 'marketing' ? "bg-brand-ink text-white shadow-md" : "text-slate-500 hover:bg-brand-muted"
+            )}
+          >
+            <Sparkles className="w-4 h-4" />
+            Product
+          </button>
+          <button
             onClick={() => setView('seller')}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all",
@@ -59,7 +70,7 @@ export default function App() {
             )}
           >
             <Home className="w-4 h-4" />
-            Seller View
+            Lead Capture Demo
           </button>
           <button
             onClick={() => setView('agent')}
@@ -69,7 +80,7 @@ export default function App() {
             )}
           >
             <Users className="w-4 h-4" />
-            Agent View
+            Agent Portal
           </button>
           {user && view === 'agent' && (
             <button
@@ -96,7 +107,12 @@ export default function App() {
             />
           </div>
         )}
-        {view === 'seller' ? (
+        {view === 'marketing' ? (
+          <MarketingLanding 
+            onTryDemo={() => setView('seller')} 
+            onLogin={() => setView('agent')} 
+          />
+        ) : view === 'seller' ? (
           <div className="max-w-4xl mx-auto px-4">
             {!capturedLead ? (
               <LeadMagnet onLeadCaptured={handleLeadCaptured} />
@@ -129,9 +145,19 @@ export default function App() {
       </main>
 
       {/* Footer / Branding */}
-      <footer className="fixed bottom-6 left-6 flex items-center gap-2 text-slate-400">
-        <Building2 className="w-5 h-5" />
-        <span className="text-sm font-bold tracking-tighter uppercase">EstateFlow AI</span>
+      <footer className="fixed bottom-6 left-6 flex items-center gap-6 text-slate-400">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-5 h-5" />
+          <span className="text-sm font-bold tracking-tighter uppercase">EstateFlow AI</span>
+        </div>
+        {!user && view === 'seller' && (
+          <button 
+            onClick={() => setView('agent')}
+            className="text-xs font-bold uppercase tracking-widest hover:text-brand-accent transition-colors border-l border-slate-200 pl-6"
+          >
+            Agent Login
+          </button>
+        )}
       </footer>
     </div>
   );

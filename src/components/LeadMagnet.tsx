@@ -19,9 +19,10 @@ export default function LeadMagnet({ onLeadCaptured }: LeadMagnetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
+  const hasApiKey = !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
@@ -121,7 +122,7 @@ export default function LeadMagnet({ onLeadCaptured }: LeadMagnetProps) {
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 z-10">
                   <MapPin className="w-5 h-5" />
                 </div>
-                {isLoaded ? (
+                {isLoaded && hasApiKey ? (
                   <Autocomplete
                     onLoad={onAutocompleteLoad}
                     onPlaceChanged={onPlaceChanged}

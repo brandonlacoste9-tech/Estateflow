@@ -1,18 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Map, Image as ImageIcon, Sparkles, Loader2, ExternalLink, Maximize2, Globe } from 'lucide-react';
+import { Search, Map, Image as ImageIcon, Sparkles, Loader2, ExternalLink, Maximize2, Globe, Bookmark, Trash2, History } from 'lucide-react';
 import { getMarketTrends, getLocalRealEstateInsights, generatePropertyVisualization, analyzeListingUrl } from '../services/geminiService';
 import { cn } from '../lib/utils';
+import { collection, addDoc, serverTimestamp, query, onSnapshot, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 
 type Tool = 'search' | 'maps' | 'image' | 'crawl';
 
 export default function AITools() {
   const [activeTool, setActiveTool] = useState<Tool>('search');
-  const [query, setQuery] = useState('');
+  const [queryText, setQueryText] = useState('');
   const [location, setLocation] = useState('San Francisco, CA');
   const [aspectRatio, setAspectRatio] = useState<any>("16:9");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [savedSearches, setSavedSearches] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const q = query(
+      collection(db, 'users', auth.currentUser.uid, 'savedSearches'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const searches = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setSavedSearches(searches);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleRunTool = async () => {
     setLoading(true);
@@ -22,13 +45,13 @@ export default function AITools() {
         const data = await getMarketTrends(location);
         setResult(data);
       } else if (activeTool === 'maps') {
-        const data = await getLocalRealEstateInsights(location, query || "top rated schools and amenities");
+        const data = await getLocalRealEstateInsights(location, queryText || "top rated schools and amenities");
         setResult(data);
       } else if (activeTool === 'image') {
-        const imageUrl = await generatePropertyVisualization(query || "A modern luxury home with large windows and a pool at sunset", aspectRatio);
+        const imageUrl = await generatePropertyVisualization(queryText || "A modern luxury home with large windows and a pool at sunset", aspectRatio);
         setResult({ imageUrl });
       } else if (activeTool === 'crawl') {
-        const data = await analyzeListingUrl(query);
+        const data = await analyzeListingUrl(queryText);
         setResult(data);
       }
     } catch (error) {
@@ -39,40 +62,125 @@ export default function AITools() {
     }
   };
 
+  const handleSaveSearch = async () => {
+    if (!auth.currentUser) return;
+    
+    setIsSaving(true);
+    try {
+      const name = activeTool === 'search' ? `Market: ${location}` : 
+                   activeTool === 'maps' ? `Local: ${location}` :
+                   activeTool === 'crawl' ? `Listing: ${queryText.substring(0, 20)}...` :
+                   `Visual: ${queryText.substring(0, 20)}...`;
+
+      await addDoc(collection(db, 'users', auth.currentUser.uid, 'savedSearches'), {
+        agentUid: auth.currentUser.uid,
+        name,
+        tool: activeTool,
+        params: {
+          location,
+          query: queryText,
+          aspectRatio
+        },
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Save Error:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSearch = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!auth.currentUser) return;
+    try {
+      await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'savedSearches', id));
+    } catch (error) {
+      console.error("Delete Error:", error);
+    }
+  };
+
+  const loadSavedSearch = (search: any) => {
+    setActiveTool(search.tool);
+    setLocation(search.params.location || '');
+    setQueryText(search.params.query || '');
+    setAspectRatio(search.params.aspectRatio || '16:9');
+    setResult(null);
+  };
+
   return (
-    <div className="bg-white rounded-[40px] border border-brand-border overflow-hidden shadow-sm flex flex-col md:flex-row h-[600px]">
+    <div className="bg-white rounded-[40px] border border-brand-border overflow-hidden shadow-sm flex flex-col md:flex-row h-[700px]">
       {/* Sidebar */}
-      <div className="w-full md:w-64 bg-brand-muted border-r border-brand-border p-6 space-y-2">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 px-2">AI Power Tools</h3>
-        
-        <ToolButton 
-          active={activeTool === 'search'} 
-          onClick={() => setActiveTool('search')}
-          icon={Search}
-          label="Market Trends"
-          description="Google Search Grounding"
-        />
-        <ToolButton 
-          active={activeTool === 'maps'} 
-          onClick={() => setActiveTool('maps')}
-          icon={Map}
-          label="Local Insights"
-          description="Google Maps Grounding"
-        />
-        <ToolButton 
-          active={activeTool === 'crawl'} 
-          onClick={() => setActiveTool('crawl')}
-          icon={Globe}
-          label="Listing Analyzer"
-          description="URL Context Crawling"
-        />
-        <ToolButton 
-          active={activeTool === 'image'} 
-          onClick={() => setActiveTool('image')}
-          icon={ImageIcon}
-          label="Property Visualizer"
-          description="Gemini Image Gen"
-        />
+      <div className="w-full md:w-72 bg-brand-muted border-r border-brand-border flex flex-col">
+        <div className="p-6 space-y-2 overflow-y-auto flex-1">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 px-2">AI Power Tools</h3>
+          
+          <ToolButton 
+            active={activeTool === 'search'} 
+            onClick={() => setActiveTool('search')}
+            icon={Search}
+            label="Market Trends"
+            description="Google Search Grounding"
+          />
+          <ToolButton 
+            active={activeTool === 'maps'} 
+            onClick={() => setActiveTool('maps')}
+            icon={Map}
+            label="Local Insights"
+            description="Google Maps Grounding"
+          />
+          <ToolButton 
+            active={activeTool === 'crawl'} 
+            onClick={() => setActiveTool('crawl')}
+            icon={Globe}
+            label="Listing Analyzer"
+            description="URL Context Crawling"
+          />
+          <ToolButton 
+            active={activeTool === 'image'} 
+            onClick={() => setActiveTool('image')}
+            icon={ImageIcon}
+            label="Property Visualizer"
+            description="Gemini Image Gen"
+          />
+
+          {savedSearches.length > 0 && (
+            <div className="pt-8 space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Saved Searches</h3>
+                <History className="w-3 h-3 text-slate-400" />
+              </div>
+              <div className="space-y-1">
+                {savedSearches.map((search) => (
+                  <button
+                    key={search.id}
+                    onClick={() => loadSavedSearch(search)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-white hover:shadow-sm transition-all group text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shrink-0 border border-brand-border">
+                        {search.tool === 'search' ? <Search className="w-4 h-4 text-slate-400" /> :
+                         search.tool === 'maps' ? <Map className="w-4 h-4 text-slate-400" /> :
+                         search.tool === 'crawl' ? <Globe className="w-4 h-4 text-slate-400" /> :
+                         <ImageIcon className="w-4 h-4 text-slate-400" />}
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-600 truncate">{search.name}</p>
+                        <p className="text-[10px] text-slate-400">{new Date(search.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => handleDeleteSearch(e, search.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -98,8 +206,8 @@ export default function AITools() {
                 </label>
                 <input 
                   type="text" 
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value={queryText}
+                  onChange={(e) => setQueryText(e.target.value)}
                   placeholder={activeTool === 'maps' ? "e.g. Best coffee shops, commute times..." : activeTool === 'crawl' ? "https://www.zillow.com/homedetails/..." : "e.g. Modern kitchen with marble island..."}
                   className="w-full bg-brand-muted border-none rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-brand-accent outline-none"
                 />
@@ -129,14 +237,25 @@ export default function AITools() {
             </div>
           )}
 
-          <button 
-            onClick={handleRunTool}
-            disabled={loading}
-            className="w-full bg-brand-accent text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-brand-accent/20"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-            {loading ? 'Processing with AI...' : `Run ${activeTool === 'search' ? 'Market Analysis' : activeTool === 'maps' ? 'Local Search' : 'Visualization'}`}
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleRunTool}
+              disabled={loading}
+              className="flex-1 bg-brand-accent text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-brand-accent/20"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+              {loading ? 'Processing with AI...' : `Run ${activeTool === 'search' ? 'Market Analysis' : activeTool === 'maps' ? 'Local Search' : 'Visualization'}`}
+            </button>
+            <button 
+              onClick={handleSaveSearch}
+              disabled={isSaving || (!location && !queryText)}
+              className="px-6 bg-white border border-brand-border text-slate-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-brand-muted transition-all active:scale-[0.98] disabled:opacity-50"
+              title="Save Search"
+            >
+              {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Bookmark className="w-5 h-5" />}
+              <span className="hidden md:inline">Save</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 bg-brand-muted/30">

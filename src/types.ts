@@ -8,6 +8,7 @@ export interface Lead {
   budget?: string;
   timeline?: string;
   transcript?: string;
+  photoURL?: string;
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
 }

@@ -27,6 +27,7 @@
         "budget": { "type": "string", "description": "The lead's budget." },
         "timeline": { "type": "string", "description": "The lead's moving timeline." },
         "transcript": { "type": "string", "description": "The full chat transcript." },
+        "photoURL": { "type": "string", "description": "The URL of the property photo." },
         "agentUid": { "type": "string", "description": "The UID of the agent assigned to this lead." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the lead was created." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "When the lead was last updated." }
@@ -44,6 +45,19 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "When the message was sent." }
       },
       "required": ["leadId", "role", "content"]
+    },
+    "SavedSearch": {
+      "title": "Saved Search",
+      "description": "A saved search or filter for an agent.",
+      "type": "object",
+      "properties": {
+        "agentUid": { "type": "string", "description": "The UID of the agent who saved the search." },
+        "name": { "type": "string", "description": "The name of the saved search." },
+        "tool": { "type": "string", "description": "The tool used for the search (e.g., 'search', 'maps', 'leads')." },
+        "params": { "type": "object", "description": "The search parameters (e.g., { location, query, filter })." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the search was saved." }
+      },
+      "required": ["agentUid", "name", "tool", "params"]
     }
   },
   "firestore": {
@@ -58,6 +72,10 @@
     "/leads/{leadId}/messages/{messageId}": {
       "schema": "Message",
       "description": "Subcollection of messages for each lead."
+    },
+    "/users/{uid}/savedSearches/{searchId}": {
+      "schema": "SavedSearch",
+      "description": "Subcollection of saved searches for each agent."
     }
   }
 }

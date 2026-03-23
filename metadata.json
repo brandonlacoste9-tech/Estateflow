@@ -1,5 +1,5 @@
 {
   "name": "EstateFlow AI",
-  "description": "AI-powered real estate lead generator and agent dashboard for qualifying home sellers.",
+  "description": "AI-powered growth platform for realtors. Automate lead capture, qualification, and follow-ups with conversational intelligence.",
   "requestFramePermissions": ["geolocation"]
 }

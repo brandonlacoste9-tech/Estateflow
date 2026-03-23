@@ -89,13 +89,8 @@ export default function ChatInterface({ leadId, address, onComplete }: ChatInter
         createdAt: serverTimestamp()
       });
 
-      // 2. Update lead status to qualifying
-      await updateDoc(doc(db, 'leads', leadId), {
-        status: 'qualifying',
-        updatedAt: serverTimestamp()
-      });
-
-      // 3. If we have enough messages, analyze intent
+      // 2. Update lead status
+      // If we have enough context (at least 4 messages), perform deep AI analysis
       if (messages.length >= 4) {
         const transcript = messages.map(m => `${m.role}: ${m.content}`).join('\n') + `\nuser: ${userContent}`;
         const intent = await analyzeLeadIntent(transcript);
@@ -119,6 +114,12 @@ export default function ChatInterface({ leadId, address, onComplete }: ChatInter
         });
         
         onComplete(transcript);
+      } else {
+        // For early engagement, just mark as qualifying
+        await updateDoc(doc(db, 'leads', leadId), {
+          status: 'qualifying',
+          updatedAt: serverTimestamp()
+        });
       }
     } catch (error) {
       console.error('Error in chat flow:', error);
